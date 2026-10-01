@@ -1,6 +1,4 @@
-# PF_APELLIDO - Pipeline DevOps para Flight Status
-
-> Antes de exportar a PDF, reemplazar `APELLIDO`, completar fecha y enlace del repositorio, y agregar las evidencias reales indicadas abajo.
+# Raña Javier - Proyecto Final - Pipeline DevOps para Flight Status - 10/2026
 
 ## 1. Introducción
 
@@ -23,7 +21,7 @@ El Dockerfile separa la creación de dependencias, la ejecución de tests y la i
 
 **Comandos de validación ejecutados:**
 
-```text
+```bash
 docker build -t flight-status:local .
 docker run -d -p 8080:8080 flight-status:local
 curl http://localhost:8080/health
@@ -58,45 +56,57 @@ Prometheus scrapea `/metrics` cada 15 segundos. Grafana usa Prometheus como data
 
 **Evidencia:** insertar captura del dashboard con tráfico generado y del target `flight-status` en Prometheus.
 
-## 8. Pasos rápidos de entrega
-
-```bash
-git clone https://github.com/<usuario>/<repositorio>.git
-cd <repositorio>
-cp .env.example .env
-# añade la AIRLABS_API_KEY en .env o en el Secret de Kubernetes
-
-docker build -t flight-status:local .
-minikube start --driver=docker
-minikube addons enable ingress metrics-server
-minikube image load flight-status:local
-terraform -chdir=terraform init
-terraform -chdir=terraform plan -var='app_image=flight-status:local'
-terraform -chdir=terraform apply -var='app_image=flight-status:local'
-```
-
-Para publicar la imagen en Docker Hub y reutilizarla desde el cluster:
-
-```bash
-docker login
-# opcional: usa tu usuario de Docker Hub
-
-docker build -t <usuario>/flight-status:latest .
-docker push <usuario>/flight-status:latest
-terraform -chdir=terraform apply -var='app_image=<usuario>/flight-status:latest'
-```
-
 ## 7. FinOps y seguridad
 
 No se aprovisionan instancias ni servicios cloud pagados. Minikube corre local; el HPA tiene máximo de 3 réplicas; los Pods declaran requests/limits; Prometheus conserva 24 horas y almacenamiento efímero. Para liberar recursos, se ejecutan `terraform destroy` y `minikube stop`.
 
 La clave API se guarda en `.env` local ignorado o en un Secret de Kubernetes/GitHub Actions. Terraform state, archivos `.env` y credenciales no deben subirse al repositorio.
 
-## 8. Reproducción y limitaciones
+## 8. Comandos rápidos
+
+```bash
+# Clonar el repositorio público.
+git clone https://github.com/javierrana84/proyecto_final.git
+# Entrar en el directorio del proyecto.
+cd proyecto_final
+# Crear el archivo local para configurar la API key.
+cp .env.example .env
+# Añadir AIRLABS_API_KEY en .env o crear el Secret de Kubernetes.
+
+# Construir la imagen local; el build ejecuta las pruebas.
+docker build -t flight-status:local .
+# Iniciar Minikube con Docker como driver.
+minikube start --driver=docker
+# Habilitar Ingress y métricas para el HPA.
+minikube addons enable ingress metrics-server
+# Cargar la imagen local en el clúster.
+minikube image load flight-status:local
+# Inicializar Terraform y descargar providers.
+terraform -chdir=terraform init
+# Revisar los cambios que Terraform propone.
+terraform -chdir=terraform plan -var='app_image=flight-status:local'
+# Aplicar los recursos al clúster.
+terraform -chdir=terraform apply -var='app_image=flight-status:local'
+```
+
+Para publicar la imagen en Docker Hub y reutilizarla desde el cluster:
+
+```bash
+# Autenticarse en Docker Hub.
+docker login
+# Construir y etiquetar la imagen con el usuario de Docker Hub.
+docker build -t javierrana84/flight-status:latest .
+# Publicar la imagen en Docker Hub.
+docker push javierrana84/flight-status:latest
+# Aplicar en Kubernetes usando la imagen publicada.
+terraform -chdir=terraform apply -var='app_image=javierrana84/flight-status:latest'
+```
+
+## 9. Reproducción y limitaciones
 
 Los pasos completos para instalar dependencias, desplegar en Minikube, validar métricas y limpiar el entorno están en `README.md`. La cobertura y cuota de vuelos dependen del plan vigente de AirLabs; la búsqueda no puede garantizar que un vuelo histórico o inactivo aparezca. El clúster local no simula una VPC ni infraestructura cloud y el deploy de GitHub Actions es temporal.
 
-## 9. Registro de evidencias
+## 10. Registro de evidencias
 
 | Evidencia | Ruta o enlace | Commit/fecha |
 | --- | --- | --- |
@@ -105,8 +115,17 @@ Los pasos completos para instalar dependencias, desplegar en Minikube, validar m
 | Consulta real de vuelo | AA73, LAX -> SYD, en-route; link Maps visible | 2026-09-30 |
 | Prometheus/Grafana | Target `up=1`; dashboard disponible por API | 2026-09-30 |
 | GitHub Actions y reporte ZAP | [Corrida 95f0d56](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985); [reporte JSON](../zap-baseline-report/zap-report.json) | 2026-10-01 |
-| Capturas para el PDF | Pendiente de insertar directamente en este informe | Pendiente |
 
-## 10. Conclusión
+## 11. Conclusión
 
-La solución integra la aplicación, una imagen probada, el aprovisionamiento reproducible de recursos Kubernetes locales, una consulta real a AirLabs y telemetría Prometheus/Grafana. Las pruebas locales, la publicación en GHCR y el DAST remoto están verificados; el workflow usó una clave placeholder y no realizó consultas reales a AirLabs. Inserta las capturas finales antes de exportar este documento como `PF_APELLIDO.pdf` y subirlo a Drive.
+La solución integra la aplicación, una imagen probada, el aprovisionamiento reproducible de recursos Kubernetes locales, una consulta real a AirLabs y telemetría Prometheus/Grafana. Las pruebas locales, la publicación en GHCR y el DAST remoto están verificados; el workflow usó una clave placeholder y no realizó consultas reales a AirLabs.
+
+| Recurso | Enlace o referencia | Acceso |
+| --- | --- | --- |
+| Repositorio | [github.com/javierrana84/proyecto_final](https://github.com/javierrana84/proyecto_final) | Público |
+| Imagen de la aplicación | [Docker Hub: flight-status](https://hub.docker.com/r/javierrana84/flight-status) (`docker pull javierrana84/flight-status:latest`) | Pública |
+| CI/CD y DAST | [Corrida 95f0d56](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985) | GitHub Actions; despliegue efímero |
+| Reporte ZAP | [zap-report.json](https://github.com/javierrana84/proyecto_final/blob/main/zap-baseline-report/zap-report.json) | Archivo del repositorio |
+| Aplicación | [http://localhost:8081](http://localhost:8081) | Local; requiere Minikube y `./scripts/deploy-minikube.sh` activo |
+| Grafana | [http://localhost:3000](http://localhost:3000) | Local; requiere el port-forward activo |
+| Prometheus | [http://localhost:9090/targets](http://localhost:9090/targets) | Local; requiere el port-forward de Prometheus |
