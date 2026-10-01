@@ -5,11 +5,39 @@ Aplicación web para consultar vuelos por número IATA (por ejemplo, `IB6842`). 
 ## Arquitectura
 
 ```text
-Navegador -> Ingress -> Service -> Deployment Flask -> AirLabs API
-                                     | /metrics
-                                     v
-                                Prometheus -> Grafana
-GitHub Actions -> tests/SAST -> GHCR -> Minikube efímero -> Terraform -> ZAP
+DESPLIEGUE LOCAL (MINIKUBE)
+
+         +-- port-forward :8081 --+
+         |                        v
+[Navegador] -------------+                   [Service app :80]
+   |                                             |
+   +-- port-forward :3000 --> [Grafana]           v
+              |         [Deployment Flask]
+              |                |
+              |                +-- HTTPS --> [AirLabs API]
+              |                |                 ^
+              |                +-- usa Secret --+
+              |                   AIRLABS_API_KEY
+              |
+              +-- datasource --> [Prometheus]
+                      ^
+                      +-- scrape /metrics
+                      cada 15 segundos
+                      desde Service app
+
+[Terraform] -- crea namespace, Services, Deployments, Ingress y HPA
+
+CI/CD (GITHUB ACTIONS, ENTORNO EFIMERO)
+
+[Push a main] --> [Tests + SAST + pip-audit + build]
+          |
+          v
+        [GHCR, imagen por commit SHA]
+          |
+          v
+        [Terraform + Minikube temporal] --> [ZAP DAST]
+          |
+          +----------------------------> minikube delete
 ```
 
 Terraform administra un namespace y sus recursos Kubernetes a través de un módulo reutilizable. Minikube crea el clúster local; no se provisiona una nube ni recursos con costo. El HPA mantiene de 1 a 3 réplicas para el laboratorio.
