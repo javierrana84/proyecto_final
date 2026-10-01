@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f3f5ef">
+    <title>DevOps &amp; Cloud | Flight Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <div class="brand" aria-label="Flight Status DevOps project">
+          <span class="brand-mark" aria-hidden="true">✈</span>
+          <div class="brand-text">
+            <span class="brand-title">Flight Status</span>
+            <span class="brand-subtitle">DevOps &amp; Cloud</span>
+          </div>
+        </div>
+        <div class="header-meta">
+          <span class="environment">Created by: Javier Raña</span>
+          <span class="environment">Curso: DevOps &amp; Cloud - Coderhouse</span>
+          <span class="environment">Camada: 102085</span>
+        </div>
+      </header>
+
+      <section class="overview" aria-labelledby="page-title">
+        <p class="eyebrow">AVIACI&Oacute;N / SEGUIMIENTO EN VIVO</p>
+        <h1 id="page-title">Tu vuelo, en ruta.</h1>
+        <p class="intro">Consulta el estado y la ruta de un vuelo con su n&uacute;mero IATA. Los datos dependen de la cobertura del proveedor.</p>
+        <div class="status-line">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>Servicio operativo</span>
+          <span class="version">Versi&oacute;n {{ version }}</span>
+        </div>
+      </section>
+
+      <section class="search" aria-labelledby="search-title">
+        <form id="flight-form">
+          <label for="flight-number" id="search-title">N&uacute;mero de vuelo</label>
+          <div class="search-row">
+            <input id="flight-number" name="flight_iata" type="text" placeholder="IB6842" autocomplete="off" maxlength="9" required>
+            <button type="submit">Buscar vuelo <span aria-hidden="true">&rarr;</span></button>
+          </div>
+        </form>
+        <p class="search-hint">C&oacute;digo de aerol&iacute;nea y n&uacute;mero, por ejemplo IB6842 o AA100.</p>
+        <div id="flight-result" class="flight-result" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="signals" aria-label="Se&ntilde;ales de observabilidad">
+        <article class="signal">
+          <p class="signal-label">SALUD</p>
+          <p class="signal-value">HTTP <strong>200</strong></p>
+          <a href="/health">Health check <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="signal">
+          <p class="signal-label">M&Eacute;TRICAS</p>
+          <p class="signal-value">Prometheus <strong>ON</strong></p>
+          <a href="/metrics">Endpoint <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="signal">
+          <p class="signal-label">OBSERVABILIDAD</p>
+          <p class="signal-value">Grafana <strong>ON</strong></p>
+          <a href="http://localhost:3000" target="_blank" rel="noopener noreferrer">Abrir dashboard <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        <article class="signal signal-note">
+          <p class="signal-label">ENTORNO</p>
+          <p class="signal-value">Contenedor <strong>ready</strong></p>
+          <p class="signal-caption">Imagen ligera, proceso sin privilegios.</p>
+        </article>
+      </section>
+
+      <footer>DevOps &amp; Cloud <span>·</span> Coderhouse · Camada 102085</footer>
+    </main>
+    <script nonce="{{ csp_nonce }}">
+      const form = document.querySelector('#flight-form');
+      const result = document.querySelector('#flight-result');
+
+      function createMapLink(latitude, longitude) {
+        if (latitude == null || longitude == null || String(latitude).trim() === '' || String(longitude).trim() === '') {
+          return null;
+        }
+
+        const lat = Number(latitude);
+        const lng = Number(longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          return null;
+        }
+
+        const mapsUrl = new URL('https://www.google.com/maps/search/');
+        mapsUrl.searchParams.set('api', '1');
+        mapsUrl.searchParams.set('query', `${lat},${lng}`);
+
+        const link = document.createElement('a');
+        link.className = 'flight-map-link';
+        link.href = mapsUrl.toString();
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Abrir posición en Google Maps';
+        return link;
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        result.replaceChildren();
+        result.textContent = 'Consultando estado del vuelo...';
+        const flight = new FormData(form).get('flight_iata');
+
+        try {
+          const response = await fetch(`/api/flights?flight_iata=${encodeURIComponent(flight)}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'No se pudo consultar el vuelo.');
+          if (!data.flights.length) throw new Error('No encontramos un vuelo activo con ese número.');
+
+          result.replaceChildren(...data.flights.map((flightData) => {
+            const card = document.createElement('article');
+            card.className = 'flight-card';
+            const heading = document.createElement('h2');
+            heading.textContent = flightData.flight_iata || flight;
+            const route = document.createElement('p');
+            route.className = 'flight-route';
+            route.textContent = `${flightData.dep_iata || 'Origen --'}  →  ${flightData.arr_iata || 'Destino --'}`;
+            const status = document.createElement('p');
+            status.className = 'flight-status';
+            status.textContent = `Estado: ${flightData.status || 'Sin dato'}`;
+            card.append(heading, route, status);
+            if (flightData.lat != null && flightData.lng != null) {
+              const position = document.createElement('p');
+              position.className = 'flight-position';
+              position.textContent = `Posición: ${flightData.lat}, ${flightData.lng}`;
+              card.append(position);
+
+              const mapLink = createMapLink(flightData.lat, flightData.lng);
+              if (mapLink) card.append(mapLink);
+            }
+            return card;
+          }));
+        } catch (error) {
+          result.textContent = error.message;
+        }
+      });
+    </script>
+  </body>
+</html>

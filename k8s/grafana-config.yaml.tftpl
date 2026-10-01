@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: ${namespace}
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.${namespace}.svc.cluster.local:9090
+        isDefault: true
+  dashboard-provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: Flight status
+        orgId: 1
+        folder: DevOps lab
+        type: file
+        disableDeletion: true
+        options:
+          path: /etc/grafana/provisioning/dashboards
+  dashboard.json: |
+    {
+      "id": null,
+      "uid": "flight-status",
+      "title": "Flight status service",
+      "schemaVersion": 39,
+      "version": 2,
+      "refresh": "15s",
+      "time": {"from": "now-1h", "to": "now"},
+      "templating": {"list": []},
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "App health",
+          "gridPos": {"x": 0, "y": 0, "w": 6, "h": 6},
+          "targets": [{"expr": "sum(rate(http_requests_total{route=\"/health\",status=\"200\"}[5m]))", "refId": "A", "legendFormat": "healthy"}],
+          "fieldConfig": {"defaults": {"unit": "reqps", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Calls per second",
+          "gridPos": {"x": 6, "y": 0, "w": 9, "h": 6},
+          "targets": [{"expr": "sum(rate(http_requests_total[5m]))", "refId": "A", "legendFormat": "requests/s"}]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Latency p95",
+          "gridPos": {"x": 15, "y": 0, "w": 9, "h": 6},
+          "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))", "refId": "A", "legendFormat": "p95"}],
+          "fieldConfig": {"defaults": {"unit": "s"}}
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Flight API calls",
+          "gridPos": {"x": 0, "y": 6, "w": 8, "h": 6},
+          "targets": [{"expr": "sum(rate(http_requests_total{route=\"/api/flights\"}[5m]))", "refId": "A", "legendFormat": "flight calls/s"}]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "App CPU time",
+          "gridPos": {"x": 8, "y": 6, "w": 8, "h": 6},
+          "targets": [{"expr": "app_process_cpu_seconds_total", "refId": "A", "legendFormat": "cpu seconds"}],
+          "fieldConfig": {"defaults": {"unit": "s"}}
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "App memory usage",
+          "gridPos": {"x": 16, "y": 6, "w": 8, "h": 6},
+          "targets": [{"expr": "app_process_memory_bytes", "refId": "A", "legendFormat": "memory bytes"}],
+          "fieldConfig": {"defaults": {"unit": "bytes"}}
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "App uptime",
+          "gridPos": {"x": 0, "y": 12, "w": 12, "h": 6},
+          "targets": [{"expr": "app_uptime_seconds", "refId": "A", "legendFormat": "uptime"}],
+          "fieldConfig": {"defaults": {"unit": "s"}}
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "5xx errors",
+          "gridPos": {"x": 12, "y": 12, "w": 12, "h": 6},
+          "targets": [{"expr": "sum(rate(http_requests_total{status=\"503\"}[5m])) + sum(rate(http_requests_total{status=\"502\"}[5m]))", "refId": "A", "legendFormat": "errors/s"}]
+        }
+      ]
+    }

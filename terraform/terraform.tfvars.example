@@ -1,0 +1,2 @@
+namespace = "flight-status"
+app_image = "flight-status:local"

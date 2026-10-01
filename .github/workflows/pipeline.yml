@@ -1,0 +1,187 @@
+name: Flight status CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-scan:
+    name: Test and SAST
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies and scanners
+        run: python -m pip install -r requirements.txt bandit pip-audit
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: SAST with Bandit
+        run: bandit -q -r app.py
+
+      - name: Dependency vulnerability scan
+        run: pip-audit -r requirements.txt
+
+      - name: Build and test container image
+        run: docker build -t flight-status:ci .
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform -chdir=terraform fmt -check -recursive
+          terraform -chdir=terraform init -backend=false -input=false
+          terraform -chdir=terraform validate
+
+  publish-image:
+    name: Build and publish image
+    needs: test-and-scan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Define image reference
+        id: image
+        shell: bash
+        run: |
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "ref=ghcr.io/${repository}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.image.outputs.ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-and-dast:
+    name: Deploy to ephemeral Minikube and run DAST
+    needs: publish-image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      AIRLABS_API_KEY: ${{ secrets.AIRLABS_API_KEY }}
+      FLIGHT_IMAGE: ${{ needs.publish-image.outputs.image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start ephemeral Minikube
+        uses: medyagh/setup-minikube@latest
+        with:
+          driver: docker
+          minikube-version: latest
+          kubernetes-version: v1.32.0
+
+      - name: Enable cluster add-ons
+        run: |
+          minikube addons enable ingress
+          minikube addons enable metrics-server
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Load image into Minikube
+        run: |
+          docker pull "$FLIGHT_IMAGE"
+          minikube image load "$FLIGHT_IMAGE"
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Validate Terraform formatting
+        run: terraform -chdir=terraform fmt -check -recursive
+
+      - name: Provision Kubernetes resources
+        run: |
+          terraform -chdir=terraform init -input=false
+          terraform -chdir=terraform apply -auto-approve -input=false -var="app_image=$FLIGHT_IMAGE"
+
+      - name: Create AirLabs Kubernetes Secret
+        shell: bash
+        run: |
+          set +x
+          api_key="${AIRLABS_API_KEY:-ci-placeholder-not-a-real-key}"
+          printf '%s' "$api_key" | kubectl -n flight-status create secret generic flight-api \
+            --from-file=api-key=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
+          if [[ -z "${AIRLABS_API_KEY:-}" ]]; then
+            echo "Deployment and DAST used a nonfunctional placeholder; real flight lookups need AIRLABS_API_KEY." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Wait for application and monitoring
+        run: |
+          kubectl rollout status deployment/flight-status -n flight-status --timeout=180s
+          kubectl rollout status deployment/prometheus -n flight-status --timeout=180s
+          kubectl rollout status deployment/grafana -n flight-status --timeout=180s
+
+      - name: OWASP ZAP baseline DAST
+        shell: bash
+        run: |
+          kubectl port-forward -n flight-status service/flight-status 8080:80 >/tmp/flight-port-forward.log 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          for _ in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/health >/dev/null
+          docker run --rm --network host -v "$PWD:/zap/wrk/:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:8080 -I -J /zap/wrk/zap-report.json
+
+      - name: Upload DAST report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-baseline-report
+          path: zap-report.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Remove ephemeral cluster
+        if: always()
+        run: minikube delete
