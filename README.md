@@ -217,9 +217,7 @@ minikube stop
 
 `terraform destroy` elimina el namespace y todos sus recursos del proyecto.
 
-## 9. Evidencias para la entrega
-
-Inserta las capturas directamente en `docs/INFORME_ENTREGA.md`, junto a la sección que documenta cada prueba. Luego exporta ese informe como PDF; no hace falta una carpeta de evidencias separada.
+## 9. Evidencias 
 
 Validaciones locales observadas el 2026-09-30:
 
@@ -233,13 +231,4 @@ Validaciones locales observadas el 2026-09-30:
 - Prometheus: target `flight-status` en estado `up=1`; Grafana entrega el dashboard `Flight status service`.
 - Búsqueda live: `AA73`, `LAX -> SYD`, `en-route`; la interfaz mostró latitud `-34.058034`, longitud `151.205006` y el link de Google Maps correspondiente.
 
-El workflow remoto, la publicación de la imagen en GHCR y el DAST de ZAP se ejecutaron correctamente en el commit `95f0d56`. Esa corrida usó el placeholder porque `AIRLABS_API_KEY` no está configurado como secreto de GitHub; por eso no valida consultas reales a AirLabs.
-
-Incluye en el informe las capturas propias correspondientes (no incluyas API keys):
-
-- Build Docker y resultado de los tests.
-- Recursos de Minikube listos y salida de Terraform.
-- Búsqueda de vuelo y enlace de Google Maps.
-- Dashboard de Grafana y target de Prometheus.
-- [Corrida exitosa de GitHub Actions](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985).
-- [Reporte JSON de ZAP](zap-baseline-report/zap-report.json), generado por esa corrida.
+El workflow remoto, la publicación de la imagen en GHCR y el DAST de ZAP se ejecutaron correctamente en el commit `95f0d56`. Esa corrida usó el placeholder.
