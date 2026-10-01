@@ -84,7 +84,9 @@ Con el Secret creado, ejecuta el script para reaplicar Terraform, renovar la app
 ./scripts/deploy-minikube.sh
 ```
 
-El script mantiene abierto el port-forward de la aplicación (`8081`) y abre Grafana (`3000`); si ya hay un Grafana respondiendo en el puerto `3000`, reutiliza ese túnel. Los accesos quedan activos hasta que presiones `Ctrl-C`. Abre <http://localhost:8081>; el enlace **Abrir dashboard** lleva a <http://localhost:3000>. Si el puerto `8081` está ocupado puedes cambiarlo con `APP_LOCAL_PORT=8082 ./scripts/deploy-minikube.sh`. Para usar la imagen publicada, configura `APP_IMAGE=<tu-usuario>/flight-status:latest`. El tag `latest` se descarga al reiniciar; los tags locales como `flight-status:local` usan la imagen cargada en Minikube.
+El script mantiene abiertos los port-forwards de la aplicación (`8081`) y Grafana (`3000`); si ya hay un Grafana respondiendo en el puerto `3000`, reutiliza ese túnel. Por eso la terminal queda ocupada mientras el script espera. La app y Grafana no corren en esa terminal: están dentro de Pods administrados por Deployments de Kubernetes. Al presionar `Ctrl-C` se cierran los túneles locales, pero los Pods y Minikube siguen activos. Para volver a abrir los accesos, ejecuta el script otra vez. Abre <http://localhost:8081>; el enlace **Abrir dashboard** lleva a <http://localhost:3000>. Si el puerto `8081` está ocupado puedes cambiarlo con `APP_LOCAL_PORT=8082 ./scripts/deploy-minikube.sh`. Para usar la imagen publicada, configura `APP_IMAGE=<tu-usuario>/flight-status:latest`. El tag `latest` se descarga al reiniciar; los tags locales como `flight-status:local` usan la imagen cargada en Minikube.
+
+El script es una comodidad para desarrollo local. En un despliegue real, Terraform puede ejecutarse desde CI/CD sin mantener una terminal abierta ni usar `kubectl port-forward`; el acceso se configura mediante Ingress, un balanceador o la red privada de la plataforma.
 
 Si rotas la clave, vuelve a aplicar el Secret y reinicia los Pods para que reciban el nuevo valor:
 
@@ -103,7 +105,7 @@ Si el host `flight.local` no es accesible desde tu equipo (por ejemplo, en algun
 
 ## 4. Prometheus y Grafana
 
-Los dos servicios son `ClusterIP` y no se publican a Internet. El script abre el port-forward de Grafana. Para Prometheus, abre un túnel aparte si lo necesitas:
+La aplicación, Prometheus y Grafana son Deployments separados dentro del mismo clúster y namespace. Prometheus consulta `/metrics` en el Service interno de la app cada 15 segundos; Grafana consulta a Prometheus mediante su Service interno. Los Services son `ClusterIP`, así que no se publican a Internet. El script abre el port-forward de Grafana. Para Prometheus, abre un túnel aparte si lo necesitas:
 
 ```bash
 kubectl port-forward -n flight-status service/prometheus 9090:9090
@@ -113,6 +115,8 @@ kubectl port-forward -n flight-status service/prometheus 9090:9090
 - Grafana: <http://localhost:3000>; carga el dashboard provisionado `Flight status service`. Este laboratorio usa acceso anónimo con rol `Viewer`, así que no hay credenciales de login guardadas en el repositorio ni en Terraform. No expongas el servicio fuera del equipo.
 
 Genera solicitudes en la app y revisa en Grafana las solicitudes por segundo y la latencia p95. El HPA usa CPU y escala entre 1 y 3 Pods; la métrica puede tardar unos minutos en aparecer.
+
+En una instalación real, el stack de monitoreo puede desplegarse y administrarse por separado de la aplicación. Prometheus debe tener conectividad privada hacia el endpoint de métricas de la app, o recibirlas a través de un backend compatible mediante remote write; Grafana se configura para consultar ese Prometheus o backend central. No es necesario ejecutar el script local ni exponer los Services de monitoreo públicamente.
 
 ## 5. Publicar la imagen en Docker Hub
 
