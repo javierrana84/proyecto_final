@@ -48,9 +48,9 @@ El Deployment solicita CPU/memoria, limita su consumo, usa probes y filesystem d
 
 En pull requests y pushes a `main`, el pipeline instala dependencias, ejecuta unittest, Bandit y pip-audit, construye la imagen y valida formato/sintaxis Terraform. En `main`, vuelve a construir y publica la imagen en GitHub Container Registry con el SHA del commit. Un runner efímero levanta Minikube, aplica Terraform, despliega la imagen y ejecuta ZAP Baseline contra la aplicación. Si `AIRLABS_API_KEY` no está configurado como GitHub Actions secret, usa un placeholder para que el despliegue/DAST funcionen sin cuota; las consultas reales requieren el secreto.
 
-**Estado de verificación:** actionlint validó localmente el workflow sin avisos. El workflow remoto, el push a GHCR y el escaneo ZAP deben confirmarse desde GitHub después de publicar los cambios; no se afirma que esa corrida ya haya ocurrido.
+**Estado de verificación:** la corrida [95f0d56](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985) finalizó correctamente: tests/SAST, publicación de la imagen en GHCR, despliegue efímero y DAST. El [reporte JSON de ZAP](../zap-baseline-report/zap-report.json) quedó guardado en el repositorio. El workflow usó un placeholder porque `AIRLABS_API_KEY` no está configurado como secreto de GitHub; por lo tanto, el DAST no probó consultas reales a AirLabs.
 
-**Evidencia:** insertar captura de GitHub Actions y añadir el enlace/nombre del artifact `zap-baseline-report`.
+**Evidencia:** insertar una captura de la corrida en GitHub Actions y conservar el enlace al JSON de ZAP.
 
 ## 6. Monitoreo
 
@@ -104,9 +104,9 @@ Los pasos completos para instalar dependencias, desplegar en Minikube, validar m
 | Terraform y Kubernetes | Plan sin cambios; despliegues `1/1`; HPA activo | 2026-09-30 |
 | Consulta real de vuelo | AA73, LAX -> SYD, en-route; link Maps visible | 2026-09-30 |
 | Prometheus/Grafana | Target `up=1`; dashboard disponible por API | 2026-09-30 |
-| GitHub Actions y reporte ZAP | Pendiente de push y corrida del workflow | Pendiente |
+| GitHub Actions y reporte ZAP | [Corrida 95f0d56](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985); [reporte JSON](../zap-baseline-report/zap-report.json) | 2026-10-01 |
 | Capturas para el PDF | Pendiente de insertar directamente en este informe | Pendiente |
 
 ## 10. Conclusión
 
-La solución integra la aplicación, una imagen probada, el aprovisionamiento reproducible de recursos Kubernetes locales, una consulta real a AirLabs y telemetría Prometheus/Grafana. Las pruebas y análisis locales están verificados. La publicación GHCR, DAST remoto y capturas finales quedan como tareas de entrega: deben ejecutarse desde el repositorio GitHub y registrarse con sus enlaces/logs reales antes de exportar este documento como `PF_APELLIDO.pdf` y subirlo a Drive.
+La solución integra la aplicación, una imagen probada, el aprovisionamiento reproducible de recursos Kubernetes locales, una consulta real a AirLabs y telemetría Prometheus/Grafana. Las pruebas locales, la publicación en GHCR y el DAST remoto están verificados; el workflow usó una clave placeholder y no realizó consultas reales a AirLabs. Inserta las capturas finales antes de exportar este documento como `PF_APELLIDO.pdf` y subirlo a Drive.
