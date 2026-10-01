@@ -12,7 +12,7 @@ permissions:
 jobs:
   test-and-scan:
     name: Test and SAST
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
     name: Build and publish image
     needs: test-and-scan
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -92,7 +92,7 @@ jobs:
     name: Deploy to ephemeral Minikube and run DAST
     needs: publish-image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: read
@@ -160,6 +160,9 @@ jobs:
       - name: OWASP ZAP baseline DAST
         shell: bash
         run: |
+          zap_output_dir="${RUNNER_TEMP}/zap-output"
+          mkdir -p "$zap_output_dir"
+          chmod 777 "$zap_output_dir"
           kubectl port-forward -n flight-status service/flight-status 8080:80 >/tmp/flight-port-forward.log 2>&1 &
           port_forward_pid=$!
           trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
@@ -170,16 +173,20 @@ jobs:
             sleep 2
           done
           curl --fail --silent http://127.0.0.1:8080/health >/dev/null
-          docker run --rm --network host -v "$PWD:/zap/wrk/:rw" ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://127.0.0.1:8080 -I -J /zap/wrk/zap-report.json
+          docker run --rm --network host \
+            --volume "$zap_output_dir:/zap/wrk:rw" \
+            --workdir /zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://127.0.0.1:8080 -I -J zap-report.json
+          test -s "$zap_output_dir/zap-report.json"
 
       - name: Upload DAST report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zap-baseline-report
-          path: zap-report.json
-          if-no-files-found: warn
+          path: ${{ runner.temp }}/zap-output/zap-report.json
+          if-no-files-found: error
           retention-days: 7
 
       - name: Remove ephemeral cluster
