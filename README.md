@@ -201,7 +201,7 @@ Validaciones locales observadas el 2026-09-30:
 - Prometheus: target `flight-status` en estado `up=1`; Grafana entrega el dashboard `Flight status service`.
 - Búsqueda live: `AA73`, `LAX -> SYD`, `en-route`; la interfaz mostró latitud `-34.058034`, longitud `151.205006` y el link de Google Maps correspondiente.
 
-El workflow remoto, la publicación de la imagen en GHCR y el DAST de ZAP se ejecutaron correctamente en el commit `95f0d56`. Esa corrida usó el placeholder porque `AIRLABS_API_KEY` no está configurado como secreto de GitHub; por eso no valida consultas reales a AirLabs. Las capturas para el PDF siguen pendientes.
+El workflow remoto, la publicación de la imagen en GHCR y el DAST de ZAP se ejecutaron correctamente en el commit `95f0d56`. Esa corrida usó el placeholder porque `AIRLABS_API_KEY` no está configurado como secreto de GitHub; por eso no valida consultas reales a AirLabs.
 
 Incluye en el informe las capturas propias correspondientes (no incluyas API keys):
 
@@ -211,9 +211,3 @@ Incluye en el informe las capturas propias correspondientes (no incluyas API key
 - Dashboard de Grafana y target de Prometheus.
 - [Corrida exitosa de GitHub Actions](https://github.com/javierrana84/proyecto_final/actions/runs/36808277985).
 - [Reporte JSON de ZAP](zap-baseline-report/zap-report.json), generado por esa corrida.
-
-No marques como evidencia una integración que aún no hayas ejecutado; registra también fecha, commit y cualquier limitación del plan gratuito.
-
-## 10. Informe
-
-`docs/INFORME_ENTREGA.md` contiene el borrador del reporte. Complétalo con las capturas y el enlace del repositorio, expórtalo desde Google Docs como `PF_APELLIDO.pdf` y súbelo a Drive. No incluyas `.env`, claves ni archivos `terraform.tfstate`.
